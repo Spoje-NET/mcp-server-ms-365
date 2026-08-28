@@ -31,7 +31,14 @@ program
     '--expected-home-account-id <id>',
     'Require local MSAL authentication to use this exact MSAL homeAccountId'
   )
-  .option('--read-only', 'Start server in read-only mode, disabling write operations')
+  .option(
+    '--read-only',
+    'Start server in read-only mode, disabling write operations (this is the default)'
+  )
+  .option(
+    '--no-read-only',
+    'Disable read-only mode (fail-closed default) and allow write operations'
+  )
   .option(
     '--message-signoff-prefix <text>',
     'Signoff prepended to outgoing messages (Teams sends, replies and edits; mail sends and drafts) so recipients can tell they were agent-sent, e.g. 🤖 (default: none). Equivalent env var: MS365_MCP_MESSAGE_SIGNOFF_PREFIX.'
@@ -194,8 +201,11 @@ export function parseArgs(): CommandOptions {
     }
   }
 
-  if (process.env.READ_ONLY === 'true' || process.env.READ_ONLY === '1') {
-    options.readOnly = true;
+  if (options.readOnly === undefined) {
+    // Fail-closed default: read-only unless explicitly disabled via
+    // READ_ONLY=false/0 or --no-read-only (handled above by commander).
+    const envReadOnly = process.env.READ_ONLY?.trim().toLowerCase();
+    options.readOnly = !(envReadOnly === 'false' || envReadOnly === '0');
   }
 
   if (process.env.ENABLED_TOOLS) {

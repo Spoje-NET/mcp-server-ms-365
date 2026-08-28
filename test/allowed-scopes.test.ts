@@ -205,7 +205,7 @@ describe('allowed scope HTTP behavior', () => {
     expect(graphToolMocks.registerGraphTools).toHaveBeenCalledWith(
       expect.anything(),
       {},
-      undefined,
+      true, // readOnly defaults to true (fail-closed) when omitted from options
       'mail',
       undefined,
       expect.anything(),

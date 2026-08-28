@@ -285,7 +285,7 @@ function collapseRedundantScopes(scopes: string[]): string[] {
 function buildScopesFromEndpoints(
   includeWorkAccountScopes: boolean = false,
   enabledToolsPattern?: string,
-  readOnly: boolean = false
+  readOnly: boolean = true
 ): string[] {
   const scopesSet = new Set<string>();
 
@@ -389,7 +389,7 @@ function endpointMatchesNormalToolSurface(
   endpoint: EndpointConfig,
   includeWorkAccountScopes: boolean,
   enabledToolsRegex?: RegExp,
-  readOnly: boolean = false
+  readOnly: boolean = true
 ): boolean {
   if (readOnly && endpoint.method.toUpperCase() !== 'GET') {
     if (!(endpoint.method.toUpperCase() === 'POST' && endpoint.readOnly)) {

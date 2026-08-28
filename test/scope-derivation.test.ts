@@ -7,8 +7,16 @@ import {
 } from '../src/auth.js';
 
 describe('buildScopesFromEndpoints', () => {
-  it('returns a non-empty scope set with default arguments', () => {
+  it('returns a non-empty, read-only scope set with default arguments (fail-closed)', () => {
     const scopes = buildScopesFromEndpoints();
+    expect(scopes.length).toBeGreaterThan(0);
+    // readOnly defaults to true (fail-closed), so only Read scopes are requested.
+    expect(scopes).toContain('Mail.Read');
+    expect(scopes).not.toContain('Mail.ReadWrite');
+  });
+
+  it('returns the full ReadWrite scope set when readOnly is explicitly disabled', () => {
+    const scopes = buildScopesFromEndpoints(false, undefined, false);
     expect(scopes.length).toBeGreaterThan(0);
     // Scope hierarchy collapses Read into ReadWrite when both endpoints exist.
     expect(scopes).toContain('Mail.ReadWrite');

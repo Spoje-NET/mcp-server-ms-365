@@ -1742,6 +1742,10 @@ async function executeGraphTool(
 export function registerGraphTools(
   server: McpServer,
   graphClient: GraphClient,
+  // NOTE: this parameter default is writable for test-call-site convenience
+  // only. The real fail-closed default lives in cli.ts's parseArgs() /
+  // server.ts's constructor, which always resolve and pass an explicit
+  // boolean here in production.
   readOnly: boolean = false,
   enabledToolsPattern?: string,
   orgMode: boolean = false,
@@ -2168,6 +2172,7 @@ export function scoreDiscoveryQuery(
 export function registerDiscoveryTools(
   server: McpServer,
   graphClient: GraphClient,
+  // See the same NOTE on registerGraphTools above.
   readOnly: boolean = false,
   orgMode: boolean = false,
   authManager?: AuthManager,

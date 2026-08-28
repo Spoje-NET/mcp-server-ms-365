@@ -594,7 +594,8 @@ When running as an MCP server, the following options can be used:
 
 ```
 -v                Enable verbose logging
---read-only       Start server in read-only mode, disabling write operations
+--read-only       Start server in read-only mode, disabling write operations (this is the default)
+--no-read-only    Disable read-only mode and allow write operations
 --http [port]     Use Streamable HTTP transport instead of stdio (optionally specify port, default: 3000)
                   Starts Express.js server with MCP endpoint at /mcp
 --enable-auth-tools Enable login/logout tools when using HTTP mode (disabled by default in HTTP mode)
@@ -609,7 +610,7 @@ When running as an MCP server, the following options can be used:
 
 Environment variables:
 
-- `READ_ONLY=true|1`: Alternative to --read-only flag
+- `READ_ONLY=false|0`: Alternative to --no-read-only flag (read-only is the default; `READ_ONLY=true|1` is accepted but redundant)
 - `ENABLED_TOOLS`: Filter tools using a regex pattern (alternative to --enabled-tools flag)
 - `MS365_MCP_ORG_MODE=true|1`: Enable organization/work mode (alternative to --org-mode flag)
 - `MS365_MCP_FORCE_WORK_SCOPES=true|1`: Backwards compatibility for MS365_MCP_ORG_MODE

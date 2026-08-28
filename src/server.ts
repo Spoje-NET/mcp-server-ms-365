@@ -83,7 +83,11 @@ class MicrosoftGraphServer {
 
   constructor(authManager: AuthManager, options: CommandOptions = {}) {
     this.authManager = authManager;
-    this.options = options;
+    // Fail-closed: read-only unless the caller explicitly opts out. Callers
+    // going through cli.ts's parseArgs() already get a resolved boolean here,
+    // but a direct/test instantiation with readOnly omitted must not silently
+    // default to writable.
+    this.options = { readOnly: true, ...options };
     this.graphClient = null; // Initialized in start() after secrets are loaded
     this.server = null;
     this.secrets = null;

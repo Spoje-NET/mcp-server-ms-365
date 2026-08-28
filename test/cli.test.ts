@@ -68,7 +68,9 @@ describe('CLI Module', () => {
   describe('parseArgs', () => {
     it('should return command options', () => {
       const result = parseArgs();
-      expect(result).toEqual({ file: 'test.xlsx' });
+      // readOnly defaults to true (fail-closed) when neither --read-only/
+      // --no-read-only nor READ_ONLY was set.
+      expect(result).toEqual({ file: 'test.xlsx', readOnly: true });
     });
 
     it('should parse --allowed-scopes from CLI options', () => {
