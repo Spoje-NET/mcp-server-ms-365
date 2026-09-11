@@ -2,14 +2,8 @@
 
 // Current version of this Pipeline https://github.com/VitexSoftware/BuildImages/blob/main/Test/Jenkinsfile
 
-// debian:forky disabled: Forky is still unstable/research-only.
-// The full Debian package ecosystem is not yet available for Forky.
-// Re-enable once the stack builds cleanly for Forky.
-// ubuntu:jammy disabled: jammy's default archive ships nodejs 12.22.9,
-// which cannot satisfy this package's nodejs (>= 18) build-dep/runtime
-// requirement without pulling in a third-party Node repo. Re-enable if/when
-// a suitable nodejs backport is added to jammy for this repo.
-String[] distributions = ['debian:bookworm', 'debian:trixie', 'ubuntu:noble']
+String[] distributions = ['debian:bookworm', 'debian:trixie', 'ubuntu:noble',
+            'debian:forky',]
 
 String vendor = 'vitexsoftware'
 //String distroFamily = ''
@@ -26,6 +20,7 @@ properties([
 node() {
     ansiColor('xterm') {
         stage('SCM Checkout') {
+            sh 'sudo chown -R jenkins:jenkins . 2>/dev/null || true'
             checkout scm
         }
     }
@@ -47,6 +42,7 @@ distributions.each { distro ->
         node {
             ansiColor('xterm') {
                 stage('Checkout ' + distroName) {
+                    sh 'sudo chown -R jenkins:jenkins . 2>/dev/null || true'
                     checkout scm
                     def imageName = vendor + '/' + distro
                     buildImage = docker.image(imageName)
