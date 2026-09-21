@@ -1,4 +1,4 @@
-Source: ms-365-mcp-server
+Source: mcp-server-ms-365
 Section: javascript
 Priority: optional
 Maintainer: Vítězslav Dvořák <info@vitexsoftware.cz>
@@ -9,16 +9,19 @@ Build-Depends:
  npm,
 Standards-Version: 4.7.0
 Homepage: https://github.com/Softeria/ms-365-mcp-server
-Vcs-Git: https://github.com/Spoje-NET/ms-365-mcp-server.git
-Vcs-Browser: https://github.com/Spoje-NET/ms-365-mcp-server
+Vcs-Git: https://github.com/Spoje-NET/mcp-server-ms-365.git
+Vcs-Browser: https://github.com/Spoje-NET/mcp-server-ms-365
 Rules-Requires-Root: no
 
-Package: ms-365-mcp-server
+Package: mcp-server-ms-365
 Architecture: all
 Depends:
  ${misc:Depends},
  nodejs (>= 18),
  hicolor-icon-theme,
+Provides: ms-365-mcp-server
+Replaces: ms-365-mcp-server (<< 0.136.1~)
+Breaks: ms-365-mcp-server (<< 0.136.1~)
 Description: MCP server for Microsoft 365 mail, calendar and to-do tasks
  A Model Context Protocol (MCP) server that lets LLMs interact with
  Microsoft 365 through the Graph API: mail (Outlook), calendar and
@@ -30,3 +33,14 @@ Description: MCP server for Microsoft 365 mail, calendar and to-do tasks
  /usr/share/ms-365-mcp-server, since the bulk of the upstream Node.js
  dependency tree (Azure SDK, MCP SDK, and friends — some 240 packages)
  is not available in the Debian archive.
+
+Package: mcprack-mcp-server-ms-365
+Architecture: all
+Depends:
+ ${misc:Depends},
+ mcprack (>= 1.5.1),
+ mcp-server-ms-365 (= ${binary:Version}),
+Description: Registers Microsoft 365 MCP server into mcprack catalog
+ Companion package for mcp-server-ms-365. Installing it registers the
+ ms-365-mcp-server binary as an available MCP server in the local
+ mcprack instance; removing it unregisters it again.
