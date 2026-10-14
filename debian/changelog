@@ -1,3 +1,12 @@
+mcp-server-ms-365 (0.166.0-1) unstable; urgency=medium
+
+  * New upstream version 0.166.0
+  * registerGraphTools refactored to an options object, OBO 401 on
+    rejected assertion, optional tenant/user allowlist
+
+
+ -- Vítězslav Dvořák <info@vitexsoftware.cz>  Wed, 14 Oct 2026 17:41:51 +0200
+
 mcp-server-ms-365 (0.136.1-1) unstable; urgency=medium
 
   * Rename package ms-365-mcp-server → mcp-server-ms-365
