@@ -2,8 +2,9 @@ import { Command, Option } from 'commander';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getCombinedPresetPattern, listPresets, presetRequiresOrgMode } from './tool-categories.js';
 import { assertSignoffMarkersVisible } from './lib/message-signoff.js';
+import { assertUploadDirsAbsolute } from './lib/upload-dirs.js';
+import { getCombinedPresetPattern, listPresets, presetRequiresOrgMode } from './tool-categories.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
@@ -57,12 +58,28 @@ program
     'Enable login/logout tools when using HTTP mode (disabled by default in HTTP mode)'
   )
   .option(
+    '--enable-attachment-urls',
+    'HTTP mode only. Let get-download-url mint a short-TTL, single-use URL served by this server for Graph byte resources that expose no pre-authenticated URL of their own (mail and event attachments, meeting recordings, other $value endpoints). Also adds get-download-url to any --preset that lacks it (except teams-write). Requires MS365_MCP_ATTACHMENT_URL_BASE; MS365_MCP_ATTACHMENT_URL_KEY (or _KEY_FILE) is optional and adds an HMAC signature for fetchers that verify one'
+  )
+  .option(
+    '--attachment-port <port>',
+    'HTTP mode only. Serve the attachment download route on its own listener on this port instead of on the MCP app, so a caller that can fetch attachments cannot also reach /mcp. Requires --enable-attachment-urls, and MS365_MCP_ATTACHMENT_URL_BASE must name this port. A separate port only isolates the two surfaces if they also bind separate interfaces — see --attachment-host. Equivalent env var: MS365_MCP_ATTACHMENT_PORT.'
+  )
+  .option(
+    '--attachment-host <host>',
+    'Interface the --attachment-port listener binds (IPv4, IPv6 or hostname). Defaults to whatever --http bound, which with a wildcard --http means both ports answer on every interface — so a peer allowed onto the network to fetch attachments can also reach /mcp. Bind this to the address the fetcher uses and --http to a different one to make that unreachable rather than merely un-advertised. Requires --attachment-port. Equivalent env var: MS365_MCP_ATTACHMENT_HOST.'
+  )
+  .option(
     '--enabled-tools <pattern>',
     'Filter tools using regex pattern (e.g., "excel|contact" to enable Excel and Contact tools)'
   )
   .option(
     '--allowed-scopes <scopes>',
     'Limit exposed tools to Graph scopes covered by this whitespace-separated allowlist'
+  )
+  .option(
+    '--user-fields <fields>',
+    'Allow only these comma-separated Microsoft Graph fields in user profile responses (/users and /users/{id})'
   )
   .option(
     '--extra-scopes <scopes>',
@@ -108,6 +125,14 @@ program
     'In HTTP mode, skip the built-in Bearer-token check on /mcp and ignore any forwarded Authorization header. All callers share the locally cached MSAL identity (same path stdio mode uses). Use only when an upstream reverse proxy has already authenticated the caller.'
   )
   .option(
+    '--http-local-file-tools',
+    "In HTTP mode, also register the local file tools: download-bytes-to-file, which writes files on the server as the server's user, and upload-attachment-from-file, which reads files from the MS365_MCP_UPLOAD_DIRS directories when that is set. Anyone who can reach the port can use them, so enable only on a single-user machine. Refused unless --http binds a loopback host with no --public-url and no --trust-proxy-auth."
+  )
+  .option(
+    '--blob-output',
+    'File download tools (get-mail-message-mime, get-shared-mailbox-message-mime, get-mail-attachment-content, get-shared-mailbox-attachment-content) answer an MCP EmbeddedResource with the file instead of base64 JSON in a text block. Off by default.'
+  )
+  .option(
     '--allow-unauthenticated-discovery',
     'In HTTP mode, allow MCP discovery requests (initialize, tools/list, prompts/list, resources/list, ping) without a bearer token, so a gateway can enumerate the tool catalog before any user has authenticated. Non-discovery requests (e.g. tools/call) still require a token. Off by default.'
   )
@@ -134,8 +159,23 @@ export interface CommandOptions {
   messageSignoffPrefix?: string;
   http?: string | boolean;
   enableAuthTools?: boolean;
+  enableAttachmentUrls?: boolean;
+  /**
+   * Raw, unvalidated port for the split attachment listener. A string when it
+   * came from the command line or the environment; `server.ts` is what turns it
+   * into a number and refuses the values that are not one.
+   */
+  attachmentPort?: string | number;
+  /**
+   * Raw, unvalidated bind host for the split attachment listener. Unset means
+   * "inherit whatever --http bound", which is the pre-existing behaviour and
+   * stays the default. Validated in `server.ts` alongside the port, so the two
+   * halves of one decision are refused in one place.
+   */
+  attachmentHost?: string;
   enabledTools?: string;
   allowedScopes?: string;
+  userFields?: string;
   extraScopes?: string;
   preset?: string;
   listPresets?: boolean;
@@ -151,6 +191,8 @@ export interface CommandOptions {
   authBrowser?: boolean;
   obo?: boolean;
   trustProxyAuth?: boolean;
+  httpLocalFileTools?: boolean;
+  blobOutput?: boolean;
   allowUnauthenticatedDiscovery?: boolean;
   publicUrl?: string;
   /** @deprecated use publicUrl */
@@ -174,9 +216,14 @@ export function parseArgs(): CommandOptions {
     process.env.MS365_MCP_MESSAGE_SIGNOFF_SUFFIX = '';
     process.env.MS365_MCP_MESSAGE_SIGNOFF_PREFIX = '';
   }
+  // Same for blob output, which graph-client.ts reads per download
+  if (options.blobOutput) {
+    process.env.MS365_MCP_BLOB_OUTPUT = 'true';
+  }
   // Markup in a marker is allowed (e.g. a coloured <span>), but refuse to start
   // with one that renders as empty text - html sends would look unsigned.
   assertSignoffMarkersVisible();
+  assertUploadDirsAbsolute();
 
   if (options.listPresets) {
     const presets = listPresets();
@@ -187,7 +234,10 @@ export function parseArgs(): CommandOptions {
   if (options.preset) {
     const presetNames = options.preset.split(',').map((p: string) => p.trim());
     try {
-      options.enabledTools = getCombinedPresetPattern(presetNames);
+      // The flag only acts in HTTP mode (server.ts ignores it under stdio).
+      options.enabledTools = getCombinedPresetPattern(presetNames, {
+        attachmentUrls: Boolean(options.http && options.enableAttachmentUrls),
+      });
 
       const requiresOrgMode = presetNames.some((preset: string) => presetRequiresOrgMode(preset));
       if (requiresOrgMode && !options.orgMode) {
@@ -224,6 +274,23 @@ export function parseArgs(): CommandOptions {
     process.exit(1);
   }
 
+  if (options.userFields === undefined && process.env.MS365_MCP_USER_FIELDS !== undefined) {
+    options.userFields = process.env.MS365_MCP_USER_FIELDS;
+  }
+
+  if (
+    options.userFields !== undefined &&
+    String(options.userFields)
+      .split(',')
+      .every((field: string) => field.trim() === '')
+  ) {
+    console.error(
+      'Error: --user-fields / MS365_MCP_USER_FIELDS was provided but names no fields. ' +
+        'Provide one or more comma-separated Graph fields, or omit it to disable the user profile field boundary.'
+    );
+    process.exit(1);
+  }
+
   if (options.extraScopes === undefined && process.env.MS365_MCP_EXTRA_SCOPES !== undefined) {
     options.extraScopes = process.env.MS365_MCP_EXTRA_SCOPES;
   }
@@ -234,6 +301,23 @@ export function parseArgs(): CommandOptions {
         'Provide one or more whitespace-separated scopes, or omit it.'
     );
     process.exit(1);
+  }
+
+  // CLI wins over env, same as every other option here. Left as the raw string:
+  // the value is only meaningful together with --enable-attachment-urls and
+  // --http, and both of those are decided in server.ts, so that is where it is
+  // parsed and rejected -- one message, one place, whichever way it arrived.
+  if (options.attachmentPort === undefined && process.env.MS365_MCP_ATTACHMENT_PORT !== undefined) {
+    options.attachmentPort = process.env.MS365_MCP_ATTACHMENT_PORT;
+  }
+
+  // Same idiom, same reasoning, and deliberately a variable of its own rather
+  // than a host accepted inside MS365_MCP_ATTACHMENT_PORT: a variable named
+  // _PORT holding `10.89.0.5:3001` misreads at a glance, and the two values
+  // default differently -- an absent port means "no second listener", an absent
+  // host means "inherit the MCP one".
+  if (options.attachmentHost === undefined && process.env.MS365_MCP_ATTACHMENT_HOST !== undefined) {
+    options.attachmentHost = process.env.MS365_MCP_ATTACHMENT_HOST;
   }
 
   if (
@@ -331,6 +415,13 @@ export function parseArgs(): CommandOptions {
     process.env.MS365_MCP_TRUST_PROXY_AUTH === '1'
   ) {
     options.trustProxyAuth = true;
+  }
+
+  if (
+    process.env.MS365_MCP_HTTP_LOCAL_FILE_TOOLS === 'true' ||
+    process.env.MS365_MCP_HTTP_LOCAL_FILE_TOOLS === '1'
+  ) {
+    options.httpLocalFileTools = true;
   }
 
   if (
