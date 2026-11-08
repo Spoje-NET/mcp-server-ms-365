@@ -38,7 +38,7 @@ Package: mcprack-mcp-server-ms-365
 Architecture: all
 Depends:
  ${misc:Depends},
- mcprack (>= 1.5.1),
+ mcprack (>= 1.6.0),
  mcp-server-ms-365 (= ${binary:Version}),
 Description: Registers Microsoft 365 MCP server into mcprack catalog
  Companion package for mcp-server-ms-365. Installing it registers the
